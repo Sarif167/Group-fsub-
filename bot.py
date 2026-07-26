@@ -5,18 +5,44 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
 from pyrogram.errors import UserNotParticipant
 
-# Koyeb Configs (Environment Variables se read karega)
-API_ID = int(os.environ.get("API_ID", "123456"))  # Apni API ID dalein
-API_HASH = os.environ.get("API_HASH", "YOUR_API_HASH")  # Apni API Hash dalein
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")  # Bot Father se mila Token
-FSUB_CHANNEL = os.environ.get("FSUB_CHANNEL", "YourChannelUsername")  # Bina @ ke Channel Username
+# ================= CONFIGURATIONS =================
+API_ID = int(os.environ.get("API_ID", "123456"))
+API_HASH = os.environ.get("API_HASH", "YOUR_API_HASH")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
+
+# Force Subscribe Channel (Without @)
+FSUB_CHANNEL = os.environ.get("FSUB_CHANNEL", "YourChannelUsername")
+
+# Owner / Admin ID (Integer format me)
+OWNER_ID = int(os.environ.get("OWNER_ID", "123456789"))
+
+# Main Channel & Developer Usernames (Without @)
+MAIN_CHANNEL = os.environ.get("MAIN_CHANNEL", "YourMainChannel")
+DEVELOPER_USER = os.environ.get("DEVELOPER_USER", "YourDeveloperUsername")
+
+# Payment Notification Channel (With or Without @, e.g. -100xxxxxxxxxx or ChannelUsername)
+LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "YourLogChannel")
+
+# Start Image URL
+START_IMAGE = os.environ.get("START_IMAGE", "https://telegra.ph/file/31518f8d227b6130eb5a7.jpg")
+# ===================================================
 
 bot = Client("group_manager_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# User message count store karne ke liye
+# Databases (In-Memory)
 user_msg_count = {}
+premium_groups = {} # {chat_id: expiry_datetime}
 
-# Force Subscribe Check Function
+# Helper: Check Premium Status
+def is_group_premium(chat_id):
+    if chat_id in premium_groups:
+        if datetime.now() < premium_groups[chat_id]:
+            return True
+        else:
+            del premium_groups[chat_id] # Expired
+    return False
+
+# Force Subscribe Check
 async def check_fsub(client, user_id):
     if not FSUB_CHANNEL:
         return True
@@ -30,16 +56,128 @@ async def check_fsub(client, user_id):
     except Exception:
         return True
 
-@bot.on_message(filters.group & ~filters.service & ~filters.bot)
-async def handle_messages(client, message):
-    user_id = message.from_user.id
-    chat_id = message.chat.id
-    username = message.from_user.username
+# ================= START COMMAND =================
+@bot.on_message(filters.command("start") & filters.private)
+async def start_command(client, message):
+    bot_username = (await client.get_me()).username
     
-    # Mention format (Username ho toh @username, nahi toh Naam)
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("➕ Add Me To Your Group / Channel", url=f"https://t.me/{bot_username}?startgroup=true")
+        ],
+        [
+            InlineKeyboardButton("📢 Main Channel", url=f"https://t.me/{MAIN_CHANNEL}"),
+            InlineKeyboardButton("👨‍💻 Developer", url=f"https://t.me/{DEVELOPER_USER}")
+        ],
+        [
+            InlineKeyboardButton("📖 Help & Plans", callback_data="help_cmd")
+        ]
+    ])
+    
+    caption_text = (
+        f"👋 **Hello {message.from_user.mention}!**\n\n"
+        f"Welcome to Group Manager Bot! 🚀\n\n"
+        f"Main aapke group me spam control kar sakta hoon aur automatic members add karwa sakta hoon.\n\n"
+        f"💳 **Note:** Is bot ko group me use karne ke liye aapko **Premium Plan** lena hoga."
+    )
+    
+    await message.reply_photo(
+        photo=START_IMAGE,
+        caption=caption_text,
+        reply_markup=buttons
+    )
+
+# Callback Queries for Help
+@bot.on_callback_query(filters.regex("help_cmd"))
+async def help_callback(client, callback_query):
+    help_text = (
+        "🛠 **Bot Help & Premium Plans**\n\n"
+        "**Group Admin Instructions:**\n"
+        "1. Bot ko apne group me admin banayein.\n"
+        "2. Bot ko activate karne ke liye Group ID lekar Admin/Developer ko bhejein.\n\n"
+        "💳 **Premium Plans Available:**\n"
+        "• **7 Days Plan:** Limited Trial\n"
+        "• **1 Month Plan:** Standard\n"
+        "• **2 Months Plan:** Super Value\n"
+        "• **3 Months Plan:** Best Saver\n\n"
+        "👨‍💻 Buy Premium contact Developer: @" + DEVELOPER_USER
+    )
+    await callback_query.answer()
+    await callback_query.message.edit_text(help_text)
+
+# ================= ADMIN PANEL COMMANDS =================
+
+@bot.on_message(filters.command("addgroup") & filters.user(OWNER_ID))
+async def add_premium_group(client, message):
+    try:
+        args = message.text.split()
+        if len(args) < 3:
+            await message.reply_text("❌ **Usage:** `/addgroup <group_id> <7d|1m|2m|3m>`")
+            return
+        
+        chat_id = int(args[1])
+        plan = args[2].lower()
+        
+        days_map = {"7d": 7, "1m": 30, "2m": 60, "3m": 90}
+        
+        if plan not in days_map:
+            await message.reply_text("❌ Valid plans: `7d`, `1m`, `2m`, `3m`")
+            return
+        
+        days = days_map[plan]
+        expiry_date = datetime.now() + timedelta(days=days)
+        premium_groups[chat_id] = expiry_date
+        
+        await message.reply_text(f"✅ Group `{chat_id}` added to Premium for **{days} Days**!\nExpiry: {expiry_date.strftime('%Y-%m-%d %H:%M')}")
+        
+        # Payment Log Channel Notification
+        if LOG_CHANNEL:
+            try:
+                log_text = (
+                    f"🎉 **NEW PREMIUM PURCHASED!**\n\n"
+                    f"👤 **Approved By:** {message.from_user.mention}\n"
+                    f"🆔 **Group ID:** `{chat_id}`\n"
+                    f"⏳ **Plan Duration:** {plan.upper()} ({days} Days)\n"
+                    f"📅 **Expires On:** {expiry_date.strftime('%Y-%m-%d %H:%M')}"
+                )
+                await client.send_message(chat_id=LOG_CHANNEL, text=log_text)
+            except Exception as e:
+                print(f"Log Channel Error: {e}")
+
+    except Exception as e:
+        await message.reply_text(f"Error: {e}")
+
+@bot.on_message(filters.command("remgroup") & filters.user(OWNER_ID))
+async def remove_premium_group(client, message):
+    try:
+        args = message.text.split()
+        if len(args) < 2:
+            await message.reply_text("❌ **Usage:** `/remgroup <group_id>`")
+            return
+        
+        chat_id = int(args[1])
+        if chat_id in premium_groups:
+            del premium_groups[chat_id]
+            await message.reply_text(f"🚫 Group `{chat_id}` removed from Premium.")
+        else:
+            await message.reply_text("❌ Group Premium me nahi hai.")
+    except Exception as e:
+        await message.reply_text(f"Error: {e}")
+
+# ================= GROUP MESSAGE HANDLER =================
+
+@bot.on_message(filters.group & ~filters.service & ~filters.bot)
+async def handle_group_messages(client, message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    username = message.from_user.username
     user_mention = f"@{username}" if username else message.from_user.mention
 
-    # 1. Check Force Subscribe
+    # 1. Check if Group has Premium
+    if not is_group_premium(chat_id):
+        return  # Bot feature won't work in Non-Premium groups
+
+    # 2. Check Force Subscribe
     is_subscribed = await check_fsub(client, user_id)
     if not is_subscribed:
         try:
@@ -51,33 +189,33 @@ async def handle_messages(client, message):
             [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{FSUB_CHANNEL}")]
         ])
         msg = await message.reply_text(
-            f"⚠️ {user_mention}, group me message karne ke liye aapko pehle humara channel join karna hoga!",
+            f"⚠️ {user_mention}, group me message karne ke liye pehle humara channel join karein!",
             reply_markup=fsub_button
         )
         await asyncio.sleep(10)
         await msg.delete()
         return
 
-    # Group Share & Add Member Buttons
+    # Inline Buttons
+    group_username = message.chat.username if message.chat.username else ""
     buttons = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🚀 Share Group", url=f"https://t.me/share/url?url=https://t.me/{message.chat.username if message.chat.username else ''}&text=Join%20this%20awesome%20group!"),
-            InlineKeyboardButton("➕ Add Member", url=f"https://t.me/{message.chat.username if message.chat.username else ''}?startgroup=true")
+            InlineKeyboardButton("🚀 Share Group", url=f"https://t.me/share/url?url=https://t.me/{group_username}&text=Join%20this%20awesome%20group!"),
+            InlineKeyboardButton("➕ Add Member", url=f"https://t.me/{group_username}?startgroup=true")
         ]
     ])
 
-    # 2. Count User Messages
+    # 3. Message Counting Logic
     if user_id not in user_msg_count:
         user_msg_count[user_id] = 1
     else:
         user_msg_count[user_id] += 1
 
-    # 3. Action on 5th Message
+    # 4. Action on 5th Message
     if user_msg_count[user_id] >= 5:
-        # Reset count
-        user_msg_count[user_id] = 0
+        user_msg_count[user_id] = 0  # Reset count
 
-        # Mute User for 3 Hours
+        # Mute for 3 hours
         until_time = datetime.now() + timedelta(hours=3)
         try:
             await client.restrict_chat_member(
@@ -87,7 +225,6 @@ async def handle_messages(client, message):
                 until_date=until_time
             )
 
-            # Warning Reply Message
             text = (
                 f"🚨 {user_mention}, aapne 5 messages poore kar liye hain!\n\n"
                 f"Pehle aap is group pe **3 member add karo** tabhi uske baad aap message kar sakte ho.\n\n"
@@ -97,8 +234,7 @@ async def handle_messages(client, message):
             await message.reply_text(text, reply_markup=buttons)
 
         except Exception as e:
-            print(f"Error while muting user: {e}")
+            print(f"Error Muting User: {e}")
 
-print("Bot Start ho raha hai...")
+print("Bot is Starting...")
 bot.run()
-
