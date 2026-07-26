@@ -7,9 +7,9 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermi
 from pyrogram.errors import UserNotParticipant, FloodWait
 
 # ================= CONFIGURATIONS =================
-API_ID = int(os.environ.get("API_ID", ""))
-API_HASH = os.environ.get("API_HASH", "")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+API_ID = int(os.environ.get("API_ID", "23621595"))
+API_HASH = os.environ.get("API_HASH", "de904be2b4cd4efe2ea728ded17ca77d")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8367187334:AAF1i5BYITTT12OPLNtFoeYszMYdUwp1-qc")
 
 # Force Subscribe Channel (Without @)
 FSUB_CHANNEL = os.environ.get("FSUB_CHANNEL", "MovieSearchAutoGroup")
@@ -73,10 +73,9 @@ async def web_server():
     return web_app
 
 # ================= START COMMAND =================
-# Fixed: Flexible filter for Start command
 @bot.on_message(filters.command(["start", "start@group_manager_bot"]))
 async def start_command(client, message):
-    # Only process in private or handle directly
+    # Only process in private chat
     if message.chat.type != "private":
         return
 
@@ -112,7 +111,8 @@ async def start_command(client, message):
             caption=caption_text,
             reply_markup=buttons
         )
-    except Exception:
+    except Exception as e:
+        print(f"Error sending photo: {e}")
         await message.reply_text(
             text=caption_text,
             reply_markup=buttons
@@ -263,14 +263,14 @@ async def handle_group_messages(client, message):
 
 # ================= MAIN RUNNER =================
 async def main():
-    # 1. Start Web Server
+    # 1. Web Server Setup
     app = web.AppRunner(await web_server())
     await app.setup()
     site = web.TCPSite(app, "0.0.0.0", PORT)
     await site.start()
     print(f"✅ Web Server running on Port: {PORT}")
 
-    # 2. Start Pyrogram Bot Safely
+    # 2. Pyrogram Client Startup
     try:
         await bot.start()
         print("🤖 Pyrogram Bot Started Successfully!")
@@ -280,10 +280,11 @@ async def main():
         await bot.start()
         print("🤖 Pyrogram Bot Started After Wait!")
 
-    # 3. Keep bot alive smoothly
+    # Keep App Alive
     await idle()
     await bot.stop()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
     
