@@ -9,7 +9,7 @@ from pyrogram.errors import UserNotParticipant
 # ================= CONFIGURATIONS =================
 API_ID = int(os.environ.get("API_ID", "23621595"))
 API_HASH = os.environ.get("API_HASH", "de904be2b4cd4efe2ea728ded17ca77d")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8367187334:AAF1i5BYITTT12OPLNtFoeYszMYdUwp1-qc")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "7153862044:AAFSS5pkMAHiFqtaQsrQs46kYA7q6CPlXXg")
 
 # Force Subscribe Channel (Without @)
 FSUB_CHANNEL = os.environ.get("FSUB_CHANNEL", "MovieSearchAutoGroup")
