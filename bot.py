@@ -25,7 +25,7 @@ DEVELOPER_USER = os.environ.get("DEVELOPER_USER", "botmaster55").replace("@", ""
 LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-1001860172104")
 
 # Start Image URL
-START_IMAGE = os.environ.get("START_IMAGE", "https://telegra.ph/file/31518f8d227b6130eb5a7.jpg")
+START_IMAGE = os.environ.get("START_IMAGE", "https://iili.io/CO0XKVn.jpg")
 
 # Port for Koyeb Health Check
 PORT = int(os.environ.get("PORT", "8000"))
