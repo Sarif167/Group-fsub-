@@ -31,7 +31,14 @@ START_IMAGE = os.environ.get("START_IMAGE", "https://iili.io/CO0XKVn.jpg")
 PORT = int(os.environ.get("PORT", "8000"))
 # ===================================================
 
-bot = Client("group_manager_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# Memory Session use kar rahe hain taaki Koyeb par session lock ki problem na aaye
+bot = Client(
+    "group_manager_bot", 
+    api_id=API_ID, 
+    api_hash=API_HASH, 
+    bot_token=BOT_TOKEN,
+    in_memory=True
+)
 
 # Databases (In-Memory)
 user_msg_count = {}
@@ -75,7 +82,6 @@ async def web_server():
 # ================= START COMMAND =================
 @bot.on_message(filters.command(["start", "start@group_manager_bot"]))
 async def start_command(client, message):
-    # Only process in private chat
     if message.chat.type != "private":
         return
 
@@ -112,7 +118,7 @@ async def start_command(client, message):
             reply_markup=buttons
         )
     except Exception as e:
-        print(f"Error sending photo: {e}")
+        print(f"Error sending photo, falling back to text: {e}")
         await message.reply_text(
             text=caption_text,
             reply_markup=buttons
@@ -262,15 +268,15 @@ async def handle_group_messages(client, message):
             print(f"Error Muting User: {e}")
 
 # ================= MAIN RUNNER =================
-async def main():
-    # 1. Web Server Setup
+async def start_app():
+    # 1. Web Server Start
     app = web.AppRunner(await web_server())
     await app.setup()
     site = web.TCPSite(app, "0.0.0.0", PORT)
     await site.start()
     print(f"✅ Web Server running on Port: {PORT}")
 
-    # 2. Pyrogram Client Startup
+    # 2. Pyrogram Client Start
     try:
         await bot.start()
         print("🤖 Pyrogram Bot Started Successfully!")
@@ -280,11 +286,11 @@ async def main():
         await bot.start()
         print("🤖 Pyrogram Bot Started After Wait!")
 
-    # Keep App Alive
+    # 3. Idle Keep-Alive
     await idle()
     await bot.stop()
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    loop.run_until_complete(start_app())
     
