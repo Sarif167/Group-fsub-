@@ -15,7 +15,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "8367187334:AAF1i5BYITTT12OPLNtFoeYszMYd
 FSUB_CHANNEL = os.environ.get("FSUB_CHANNEL", "MovieSearchAutoGroup")
 
 # Owner / Admin ID (Integer format me)
-OWNER_ID = int(os.environ.get("OWNER_ID", "1249672673"))
+OWNER_ID = int(os.environ.get("OWNER_ID", "5506357900"))
 
 # Main Channel & Developer Usernames (Without @)
 MAIN_CHANNEL = os.environ.get("MAIN_CHANNEL", "MovieSearchAutoGroup")
