@@ -1,6 +1,7 @@
 import os
 import asyncio
 from datetime import datetime, timedelta
+from aiohttp import web
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
 from pyrogram.errors import UserNotParticipant
@@ -11,20 +12,23 @@ API_HASH = os.environ.get("API_HASH", "de904be2b4cd4efe2ea728ded17ca77d")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8367187334:AAF1i5BYITTT12OPLNtFoeYszMYdUwp1-qc")
 
 # Force Subscribe Channel (Without @)
-FSUB_CHANNEL = os.environ.get("FSUB_CHANNEL", "YourChannelUsername")
+FSUB_CHANNEL = os.environ.get("FSUB_CHANNEL", "MovieSearchAutoGroup")
 
 # Owner / Admin ID (Integer format me)
 OWNER_ID = int(os.environ.get("OWNER_ID", "1249672673"))
 
 # Main Channel & Developer Usernames (Without @)
 MAIN_CHANNEL = os.environ.get("MAIN_CHANNEL", "MovieSearchAutoGroup")
-DEVELOPER_USER = os.environ.get("DEVELOPER_USER", "@botmaster55")
+DEVELOPER_USER = os.environ.get("DEVELOPER_USER", "botmaster55").replace("@", "")
 
 # Payment Notification Channel (With or Without @, e.g. -100xxxxxxxxxx or ChannelUsername)
 LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-1001860172104")
 
 # Start Image URL
 START_IMAGE = os.environ.get("START_IMAGE", "https://telegra.ph/file/31518f8d227b6130eb5a7.jpg")
+
+# Port for Koyeb Health Check
+PORT = int(os.environ.get("PORT", "8000"))
 # ===================================================
 
 bot = Client("group_manager_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -56,6 +60,18 @@ async def check_fsub(client, user_id):
     except Exception:
         return True
 
+# ================= KOYEB WEB SERVER =================
+routes = web.RouteTableDef()
+
+@routes.get("/", allow_head=True)
+async def root_route_handler(request):
+    return web.json_response({"status": "running", "bot": "online"})
+
+async def web_server():
+    web_app = web.Application()
+    web_app.add_routes(routes)
+    return web_app
+
 # ================= START COMMAND =================
 @bot.on_message(filters.command("start") & filters.private)
 async def start_command(client, message):
@@ -66,8 +82,8 @@ async def start_command(client, message):
             InlineKeyboardButton("➕ Add Me To Your Group / Channel", url=f"https://t.me/{bot_username}?startgroup=true")
         ],
         [
-            InlineKeyboardButton("📢 Main Channel", url=f"https://t.me/MovieSearchAutoGroup"),
-            InlineKeyboardButton("👨‍💻 Developer", url=f"https://t.me/botmaster55")
+            InlineKeyboardButton("📢 Main Channel", url=f"https://t.me/{MAIN_CHANNEL}"),
+            InlineKeyboardButton("👨‍💻 Developer", url=f"https://t.me/{DEVELOPER_USER}")
         ],
         [
             InlineKeyboardButton("📖 Help & Plans", callback_data="help_cmd")
@@ -100,7 +116,7 @@ async def help_callback(client, callback_query):
         "• **1 Month Plan:** Standard\n"
         "• **2 Months Plan:** Super Value\n"
         "• **3 Months Plan:** Best Saver\n\n"
-        "👨‍💻 Buy Premium contact Developer: @" + DEVELOPER_USER
+        f"👨‍💻 Buy Premium contact Developer: @{DEVELOPER_USER}"
     )
     await callback_query.answer()
     await callback_query.message.edit_text(help_text)
@@ -133,6 +149,7 @@ async def add_premium_group(client, message):
         # Payment Log Channel Notification
         if LOG_CHANNEL:
             try:
+                log_target = int(LOG_CHANNEL) if LOG_CHANNEL.startswith("-100") or LOG_CHANNEL.lstrip("-").isdigit() else LOG_CHANNEL
                 log_text = (
                     f"🎉 **NEW PREMIUM PURCHASED!**\n\n"
                     f"👤 **Approved By:** {message.from_user.mention}\n"
@@ -140,7 +157,7 @@ async def add_premium_group(client, message):
                     f"⏳ **Plan Duration:** {plan.upper()} ({days} Days)\n"
                     f"📅 **Expires On:** {expiry_date.strftime('%Y-%m-%d %H:%M')}"
                 )
-                await client.send_message(chat_id=LOG_CHANNEL, text=log_text)
+                await client.send_message(chat_id=log_target, text=log_text)
             except Exception as e:
                 print(f"Log Channel Error: {e}")
 
@@ -186,7 +203,7 @@ async def handle_group_messages(client, message):
             pass
         
         fsub_button = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/MovieSearchAutoGroup")]
+            [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{FSUB_CHANNEL}")]
         ])
         msg = await message.reply_text(
             f"⚠️ {user_mention}, group me message karne ke liye pehle humara channel join karein!",
@@ -236,5 +253,22 @@ async def handle_group_messages(client, message):
         except Exception as e:
             print(f"Error Muting User: {e}")
 
-print("Bot is Starting...")
-bot.run()
+# ================= MAIN RUNNER =================
+async def main():
+    # 1. Start Web Server for Koyeb Health Checks
+    app = web.AppRunner(await web_server())
+    await app.setup()
+    site = web.TCPSite(app, "0.0.0.0", PORT)
+    await site.start()
+    print(f"✅ Web Server running on Port: {PORT}")
+
+    # 2. Start Pyrogram Bot
+    await bot.start()
+    print("🤖 Pyrogram Bot Started Successfully!")
+
+    # Keep bot running
+    await asyncio.Event().wait()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+                
