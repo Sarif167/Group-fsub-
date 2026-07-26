@@ -272,3 +272,32 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
                 
+# ================= MAIN RUNNER =================
+async def main():
+    # 1. Web Server Start (Koyeb Health Check ke liye)
+    app = web.AppRunner(await web_server())
+    await app.setup()
+    site = web.TCPSite(app, "0.0.0.0", PORT)
+    await site.start()
+    print(f"✅ Web Server running on Port: {PORT}")
+
+    # 2. Pyrogram Bot Start (With FloodWait handling)
+    try:
+        await bot.start()
+        print("🤖 Pyrogram Bot Started Successfully!")
+    except Exception as e:
+        if "FLOOD_WAIT" in str(e):
+            import re
+            wait_time = int(re.findall(r'\d+', str(e))[0]) if re.findall(r'\d+', str(e)) else 600
+            print(f"⚠️ Telegram FloodWait Detected: Waiting {wait_time} seconds...")
+            await asyncio.sleep(wait_time)
+            await bot.start()
+            print("🤖 Pyrogram Bot Started After Wait!")
+        else:
+            raise e
+
+    # Keep alive
+    await asyncio.Event().wait()
+
+if __name__ == "__main__":
+    asyncio.run(main())
