@@ -2,9 +2,9 @@ import os
 import asyncio
 from datetime import datetime, timedelta
 from aiohttp import web
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
-from pyrogram.errors import UserNotParticipant
+from pyrogram.errors import UserNotParticipant, FloodWait
 
 # ================= CONFIGURATIONS =================
 API_ID = int(os.environ.get("API_ID", "23621595"))
@@ -21,7 +21,7 @@ OWNER_ID = int(os.environ.get("OWNER_ID", "1249672673"))
 MAIN_CHANNEL = os.environ.get("MAIN_CHANNEL", "MovieSearchAutoGroup")
 DEVELOPER_USER = os.environ.get("DEVELOPER_USER", "botmaster55").replace("@", "")
 
-# Payment Notification Channel (With or Without @, e.g. -100xxxxxxxxxx or ChannelUsername)
+# Payment Notification Channel (With or Without @)
 LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-1001860172104")
 
 # Start Image URL
@@ -43,7 +43,7 @@ def is_group_premium(chat_id):
         if datetime.now() < premium_groups[chat_id]:
             return True
         else:
-            del premium_groups[chat_id] # Expired
+            del premium_groups[chat_id]
     return False
 
 # Force Subscribe Check
@@ -73,10 +73,19 @@ async def web_server():
     return web_app
 
 # ================= START COMMAND =================
-@bot.on_message(filters.command("start") & filters.private)
+# Fixed: Flexible filter for Start command
+@bot.on_message(filters.command(["start", "start@group_manager_bot"]))
 async def start_command(client, message):
-    bot_username = (await client.get_me()).username
-    
+    # Only process in private or handle directly
+    if message.chat.type != "private":
+        return
+
+    try:
+        bot_obj = await client.get_me()
+        bot_username = bot_obj.username
+    except Exception:
+        bot_username = "bot"
+
     buttons = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("➕ Add Me To Your Group / Channel", url=f"https://t.me/{bot_username}?startgroup=true")
@@ -91,17 +100,23 @@ async def start_command(client, message):
     ])
     
     caption_text = (
-        f"👋 **Hello {message.from_user.mention}!**\n\n"
+        f"👋 **Hello {message.from_user.mention if message.from_user else 'User'}!**\n\n"
         f"Welcome to Group Manager Bot! 🚀\n\n"
         f"Main aapke group me spam control kar sakta hoon aur automatic members add karwa sakta hoon.\n\n"
         f"💳 **Note:** Is bot ko group me use karne ke liye aapko **Premium Plan** lena hoga."
     )
     
-    await message.reply_photo(
-        photo=START_IMAGE,
-        caption=caption_text,
-        reply_markup=buttons
-    )
+    try:
+        await message.reply_photo(
+            photo=START_IMAGE,
+            caption=caption_text,
+            reply_markup=buttons
+        )
+    except Exception:
+        await message.reply_text(
+            text=caption_text,
+            reply_markup=buttons
+        )
 
 # Callback Queries for Help
 @bot.on_callback_query(filters.regex("help_cmd"))
@@ -146,7 +161,6 @@ async def add_premium_group(client, message):
         
         await message.reply_text(f"✅ Group `{chat_id}` added to Premium for **{days} Days**!\nExpiry: {expiry_date.strftime('%Y-%m-%d %H:%M')}")
         
-        # Payment Log Channel Notification
         if LOG_CHANNEL:
             try:
                 log_target = int(LOG_CHANNEL) if LOG_CHANNEL.startswith("-100") or LOG_CHANNEL.lstrip("-").isdigit() else LOG_CHANNEL
@@ -190,11 +204,9 @@ async def handle_group_messages(client, message):
     username = message.from_user.username
     user_mention = f"@{username}" if username else message.from_user.mention
 
-    # 1. Check if Group has Premium
     if not is_group_premium(chat_id):
-        return  # Bot feature won't work in Non-Premium groups
+        return
 
-    # 2. Check Force Subscribe
     is_subscribed = await check_fsub(client, user_id)
     if not is_subscribed:
         try:
@@ -213,7 +225,6 @@ async def handle_group_messages(client, message):
         await msg.delete()
         return
 
-    # Inline Buttons
     group_username = message.chat.username if message.chat.username else ""
     buttons = InlineKeyboardMarkup([
         [
@@ -222,17 +233,14 @@ async def handle_group_messages(client, message):
         ]
     ])
 
-    # 3. Message Counting Logic
     if user_id not in user_msg_count:
         user_msg_count[user_id] = 1
     else:
         user_msg_count[user_id] += 1
 
-    # 4. Action on 5th Message
     if user_msg_count[user_id] >= 5:
-        user_msg_count[user_id] = 0  # Reset count
+        user_msg_count[user_id] = 0
 
-        # Mute for 3 hours
         until_time = datetime.now() + timedelta(hours=3)
         try:
             await client.restrict_chat_member(
@@ -255,49 +263,27 @@ async def handle_group_messages(client, message):
 
 # ================= MAIN RUNNER =================
 async def main():
-    # 1. Start Web Server for Koyeb Health Checks
+    # 1. Start Web Server
     app = web.AppRunner(await web_server())
     await app.setup()
     site = web.TCPSite(app, "0.0.0.0", PORT)
     await site.start()
     print(f"✅ Web Server running on Port: {PORT}")
 
-    # 2. Start Pyrogram Bot
-    await bot.start()
-    print("🤖 Pyrogram Bot Started Successfully!")
-
-    # Keep bot running
-    await asyncio.Event().wait()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-                
-# ================= MAIN RUNNER =================
-async def main():
-    # 1. Web Server Start (Koyeb Health Check ke liye)
-    app = web.AppRunner(await web_server())
-    await app.setup()
-    site = web.TCPSite(app, "0.0.0.0", PORT)
-    await site.start()
-    print(f"✅ Web Server running on Port: {PORT}")
-
-    # 2. Pyrogram Bot Start (With FloodWait handling)
+    # 2. Start Pyrogram Bot Safely
     try:
         await bot.start()
         print("🤖 Pyrogram Bot Started Successfully!")
-    except Exception as e:
-        if "FLOOD_WAIT" in str(e):
-            import re
-            wait_time = int(re.findall(r'\d+', str(e))[0]) if re.findall(r'\d+', str(e)) else 600
-            print(f"⚠️ Telegram FloodWait Detected: Waiting {wait_time} seconds...")
-            await asyncio.sleep(wait_time)
-            await bot.start()
-            print("🤖 Pyrogram Bot Started After Wait!")
-        else:
-            raise e
+    except FloodWait as e:
+        print(f"⚠️ Telegram FloodWait: Waiting for {e.value} seconds...")
+        await asyncio.sleep(e.value)
+        await bot.start()
+        print("🤖 Pyrogram Bot Started After Wait!")
 
-    # Keep alive
-    await asyncio.Event().wait()
+    # 3. Keep bot alive smoothly
+    await idle()
+    await bot.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
