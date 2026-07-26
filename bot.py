@@ -7,8 +7,8 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermi
 from pyrogram.errors import UserNotParticipant, FloodWait
 
 # ================= CONFIGURATIONS =================
-API_ID = int(os.environ.get("API_ID", "23621595"))
-API_HASH = os.environ.get("API_HASH", "de904be2b4cd4efe2ea728ded17ca77d")
+API_ID = int(os.environ.get("API_ID", ""))
+API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 
 # Force Subscribe Channel (Without @)
