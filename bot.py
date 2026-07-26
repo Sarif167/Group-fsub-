@@ -6,22 +6,22 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermi
 from pyrogram.errors import UserNotParticipant
 
 # ================= CONFIGURATIONS =================
-API_ID = int(os.environ.get("API_ID", "123456"))
-API_HASH = os.environ.get("API_HASH", "YOUR_API_HASH")
+API_ID = int(os.environ.get("API_ID", "23621595"))
+API_HASH = os.environ.get("API_HASH", "de904be2b4cd4efe2ea728ded17ca77d")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
 
 # Force Subscribe Channel (Without @)
 FSUB_CHANNEL = os.environ.get("FSUB_CHANNEL", "YourChannelUsername")
 
 # Owner / Admin ID (Integer format me)
-OWNER_ID = int(os.environ.get("OWNER_ID", "123456789"))
+OWNER_ID = int(os.environ.get("OWNER_ID", "1249672673"))
 
 # Main Channel & Developer Usernames (Without @)
-MAIN_CHANNEL = os.environ.get("MAIN_CHANNEL", "YourMainChannel")
-DEVELOPER_USER = os.environ.get("DEVELOPER_USER", "YourDeveloperUsername")
+MAIN_CHANNEL = os.environ.get("MAIN_CHANNEL", "MovieSearchAutoGroup")
+DEVELOPER_USER = os.environ.get("DEVELOPER_USER", "@botmaster55")
 
 # Payment Notification Channel (With or Without @, e.g. -100xxxxxxxxxx or ChannelUsername)
-LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "YourLogChannel")
+LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-1001860172104")
 
 # Start Image URL
 START_IMAGE = os.environ.get("START_IMAGE", "https://telegra.ph/file/31518f8d227b6130eb5a7.jpg")
@@ -66,8 +66,8 @@ async def start_command(client, message):
             InlineKeyboardButton("➕ Add Me To Your Group / Channel", url=f"https://t.me/{bot_username}?startgroup=true")
         ],
         [
-            InlineKeyboardButton("📢 Main Channel", url=f"https://t.me/{MAIN_CHANNEL}"),
-            InlineKeyboardButton("👨‍💻 Developer", url=f"https://t.me/{DEVELOPER_USER}")
+            InlineKeyboardButton("📢 Main Channel", url=f"https://t.me/MovieSearchAutoGroup"),
+            InlineKeyboardButton("👨‍💻 Developer", url=f"https://t.me/botmaster55")
         ],
         [
             InlineKeyboardButton("📖 Help & Plans", callback_data="help_cmd")
@@ -186,7 +186,7 @@ async def handle_group_messages(client, message):
             pass
         
         fsub_button = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{FSUB_CHANNEL}")]
+            [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/MovieSearchAutoGroup")]
         ])
         msg = await message.reply_text(
             f"⚠️ {user_mention}, group me message karne ke liye pehle humara channel join karein!",
